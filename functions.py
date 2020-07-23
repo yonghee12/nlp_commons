@@ -1,15 +1,47 @@
+from nltk import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import RegexpTokenizer
+
 from typing import *
 from datetime import datetime as dt
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from string import punctuation
+from string import ascii_letters as als
+from random import randint
 from sklearn.manifold import TSNE
+
+
+def get_random_str(n):
+    return ''.join([als[randint(0, len(als)-1)] for _ in range(n)])
+
+
+def get_tokens_sliced_by_punctuation(tokens, min_len=3, max_len=10):
+    punkt = {k: 1 for k in punctuation}
+    corpus, sentence = [], []
+    for token in tokens:
+        if punkt.get(token) or len(sentence) == max_len:
+            if len(sentence) >= min_len:
+                corpus.append(sentence)
+                sentence = []
+        else:
+            sentence.append(token.lower())
+    return corpus
 
 
 def get_sequences_from_tokens(token_list: List[str], token2idx: Dict) -> List:
     token_indices = [token2idx[token] for token in token_list]
     sequences = [token_indices[:i + 1] for i in range(1, len(token_indices))]
+    return sequences
+
+
+def get_sequences_matrix(tokens_matrix: List[List[str]], token2idx: Dict):
+    sequences = []
+    for tokens in tokens_matrix:
+        sequences += get_sequences_from_tokens(tokens, token2idx)
     return sequences
 
 
