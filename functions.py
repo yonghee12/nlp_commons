@@ -16,19 +16,23 @@ from sklearn.manifold import TSNE
 
 
 def get_random_str(n):
-    return ''.join([als[randint(0, len(als)-1)] for _ in range(n)])
+    return ''.join([als[randint(0, len(als) - 1)] for _ in range(n)])
 
 
-def get_tokens_sliced_by_punctuation(tokens, min_len=3, max_len=10):
+def get_tokens_sliced_by_punctuation(tokens: List[str], min_len=3, max_len=10):
     punkt = {k: 1 for k in punctuation}
     corpus, sentence = [], []
     for token in tokens:
-        if punkt.get(token) or len(sentence) == max_len:
+        if punkt.get(token) or not token.isalpha():
             if len(sentence) >= min_len:
                 corpus.append(sentence)
                 sentence = []
         else:
             sentence.append(token.lower())
+
+        if len(sentence) == max_len:
+            corpus.append(sentence)
+            sentence = []
     return corpus
 
 
@@ -38,10 +42,24 @@ def get_sequences_from_tokens(token_list: List[str], token2idx: Dict) -> List:
     return sequences
 
 
+def get_sequences_from_tokens_window(token_list: List[str], token2idx: Dict, window_size=2) -> List:
+    token_indices = [token2idx[token] for token in token_list]
+    length, w = len(token_indices), window_size
+    sequences = [token_indices[i:i + w] for i in range(length - (w - 1))]
+    return sequences
+
+
 def get_sequences_matrix(tokens_matrix: List[List[str]], token2idx: Dict):
     sequences = []
     for tokens in tokens_matrix:
         sequences += get_sequences_from_tokens(tokens, token2idx)
+    return sequences
+
+
+def get_sequences_matrix_window(tokens_matrix: List[List[str]], token2idx: Dict, window_size=2):
+    sequences = []
+    for tokens in tokens_matrix:
+        sequences += get_sequences_from_tokens_window(tokens, token2idx, window_size)
     return sequences
 
 
@@ -66,6 +84,18 @@ def pad_sequence_nested_lists(nested_sequence, max_len, method='pre', truncating
     return [pad_sequence_list(seq, max_len, method, truncating) for seq in nested_sequence]
 
 
+def process_line_strip(line, lower=True, rm_punct=True):
+    splitted = line.strip().split(' ')
+    strip_verse = splitted[2:]
+    joined = ' '.join(strip_verse)
+    joined = joined.lower() if lower else joined
+    return joined
+
+
+def process_multiple_lines_strip(lines, lower=True):
+    return [process_line_strip(line, lower) for line in lines]
+
+
 def to_categorical_one(index, length) -> np.ndarray:
     onehot = np.zeros(shape=(length,))
     onehot[index] = 1
@@ -88,14 +118,42 @@ def get_uniques_from_nested_lists(nested_lists: List[List]) -> List:
     return list(uniques.keys())
 
 
-def get_item2idx(items, unique=False, from_one=False) -> Tuple[Dict, Dict]:
+def get_item2idx(items, unique=False, start_from_one=False) -> Tuple[Dict, Dict]:
     item2idx, idx2item = dict(), dict()
     items_unique = items if unique else set(items)
     for idx, item in enumerate(items_unique):
-        i = idx + 1 if from_one else idx
+        i = idx + 1 if start_from_one else idx
         item2idx[item] = i
         idx2item[i] = item
     return item2idx, idx2item
+
+
+def array_index_to_wv_padding(arr, wv, idx2token, dim_restrict=None):
+    vectors, used_tokens = [], []
+    sample = wv.get_vector('hello')[:dim_restrict]
+    try:
+        for elem in arr:
+            if elem == 0:
+                vectors.append(np.zeros_like(sample))
+            else:
+                used_tokens.append(idx2token[elem])
+                vectors.append(wv.get_vector(idx2token[elem])[:dim_restrict])
+        return np.array(vectors), used_tokens
+    except Exception as e:
+        print(str(e))
+        return 'No vector', None
+
+
+def array_index_to_wv_no_padding(arr, wv, idx2token, dim_restrict=None):
+    vectors, used_tokens = [], []
+    try:
+        for elem in arr:
+            used_tokens.append(idx2token[elem])
+            vectors.append(wv.get_vector(idx2token[elem])[:dim_restrict])
+        return np.array(vectors), used_tokens
+    except Exception as e:
+        print(str(e))
+        return 'No vector', None
 
 
 def tsne_plot(labels, vectors, filename, perplexity=10, figsize=(8, 8), cmap='nipy_spectral', dpi=300):
