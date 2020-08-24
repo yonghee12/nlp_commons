@@ -145,9 +145,12 @@ def array_index_to_wv_padding(arr, wv, idx2token, dim_restrict=None):
 
 
 def array_index_to_wv_no_padding(arr, wv, idx2token, dim_restrict=None):
+    cupy_type = "<class 'cupy.core.core.ndarray'>"
+    is_cupy = True if str(type(arr)) == cupy_type else False
     vectors, used_tokens = [], []
     try:
         for elem in arr:
+            elem = elem.item() if is_cupy else elem
             used_tokens.append(idx2token[elem])
             vectors.append(wv.get_vector(idx2token[elem])[:dim_restrict])
         return np.array(vectors), used_tokens
